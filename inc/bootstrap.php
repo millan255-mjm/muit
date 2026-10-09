@@ -1,5 +1,5 @@
 <?php
-session_start();
+session_start();ini_set('display_errors','0');ini_set('log_errors','1');
 const UNI='MILLAN UNIVERSITY OF INFORMATION TECHNOLOGY';
 function env($k,$d=''){$v=getenv($k);return($v===false||$v==='')?$d:$v;}
 function db(){static $p;if($p)return $p;
@@ -16,6 +16,7 @@ foreach(["CREATE TABLE IF NOT EXISTS users(id INT AUTO_INCREMENT PRIMARY KEY,use
 "CREATE TABLE IF NOT EXISTS submissions(assignment_id INT,student_id INT,answer TEXT,PRIMARY KEY(assignment_id,student_id))",
 "CREATE TABLE IF NOT EXISTS announcements(id INT AUTO_INCREMENT PRIMARY KEY,title VARCHAR(120),body TEXT,created TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"] as $s)$p->exec($s);
 $p->exec('CREATE TABLE IF NOT EXISTS logs(id INT AUTO_INCREMENT PRIMARY KEY,user_id INT NULL,username VARCHAR(60),action VARCHAR(40),detail VARCHAR(255),ip VARCHAR(45),created TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
+$p->exec('CREATE TABLE IF NOT EXISTS files(id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(120),mime VARCHAR(60),data LONGTEXT)');
 try{$p->exec('ALTER TABLE marks ADD COLUMN max_score DECIMAL(6,1) NOT NULL DEFAULT 100');}catch(Exception $e){}
 if(!$p->query("SELECT 1 FROM users WHERE role='admin' LIMIT 1")->fetch()){
 $p->prepare("INSERT INTO users(username,password,role,name) VALUES('admin',?,'admin','System Administrator')")->execute([password_hash(env('ADMIN_PASSWORD','admin123'),PASSWORD_DEFAULT)]);
@@ -30,7 +31,7 @@ function me(){return q('SELECT * FROM users WHERE id=?',[$_SESSION['u']['id']])-
 function opts($sql,$a=[],$sel=null){$o='';foreach(q($sql,$a)->fetchAll() as $r){$r=array_values($r);$o.='<option value="'.e($r[0]).'"'.($sel==$r[0]?' selected':'').'>'.e($r[1]).'</option>';}return $o;}
 function pf($do,$id,$l,$c='',$x=''){return '<form method=post class=inl><input type=hidden name=id value="'.e($id).'">'.$x.'<button class="btn sm '.$c.'" name=do value="'.$do.'"'.(strpos($c,'no')!==false?' onclick="return confirm(\'Are you sure?\')"':'').'>'.$l.'</button></form>';}
 function tbl($h,$rows){echo '<div class=tw><table><tr>';foreach($h as $x)echo "<th>$x</th>";echo '</tr>';foreach($rows as $r){echo '<tr>';foreach($r as $c)echo "<td>$c</td>";echo '</tr>';}if(!$rows)echo '<tr><td colspan='.count($h).' class=muted>Nothing here yet.</td></tr>';echo '</table></div>';}
-function up($k){if(empty($_FILES[$k]['name'])||$_FILES[$k]['error'])return null;$x=strtolower(pathinfo($_FILES[$k]['name'],PATHINFO_EXTENSION));if(!in_array($x,['jpg','jpeg','png','pdf'])||$_FILES[$k]['size']>3e6)return null;$d=__DIR__.'/../public/uploads/';@mkdir($d,0775,true);$n=bin2hex(random_bytes(8)).".$x";move_uploaded_file($_FILES[$k]['tmp_name'],$d.$n);return $n;}
+function up($k){if(empty($_FILES[$k]['name'])||$_FILES[$k]['error']||!is_uploaded_file($_FILES[$k]['tmp_name']))return null;$x=strtolower(pathinfo($_FILES[$k]['name'],PATHINFO_EXTENSION));$m=['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','pdf'=>'application/pdf'];if(!isset($m[$x])||$_FILES[$k]['size']>3e6)return null;$d=file_get_contents($_FILES[$k]['tmp_name']);if($d===false)return null;q('INSERT INTO files(name,mime,data) VALUES(?,?,?)',[mb_substr(basename($_FILES[$k]['name']),0,120),$m[$x],base64_encode($d)]);return (string)db()->lastInsertId();}
 function head($t,$nav=[],$h=true){$cur=$_GET['p']??array_key_first($nav);
 echo '<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>'.e($t).' | MUIT</title><link rel=stylesheet href=/assets/style.css></head><body><header class=top><a class=brand href=/><span class=logo>M</span><span><b>MUIT</b><small>'.UNI.'</small></span></a><nav>';
 if(isset($_SESSION['u']))echo '<span class=who>'.e($_SESSION['u']['name']).'</span><a class="btn sm out" href=/logout.php>Logout</a>';

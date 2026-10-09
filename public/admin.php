@@ -1,7 +1,7 @@
 <?php require __DIR__.'/../inc/bootstrap.php';need('admin');
 function wipe($x){$i=$x['id'];if($x['role']=='lecturer')q('UPDATE courses SET lecturer_id=NULL WHERE lecturer_id=?',[$i]);
 else{foreach(['enrollments','attendance','marks','submissions'] as $t)q("DELETE FROM $t WHERE student_id=?",[$i]);
-foreach(q('SELECT * FROM applications WHERE username=?',[$x['username']])->fetchAll() as $a)foreach(['cert','photo','slip'] as $f)if($a[$f])@unlink(__DIR__.'/uploads/'.$a[$f]);
+foreach(q('SELECT * FROM applications WHERE username=?',[$x['username']])->fetchAll() as $a)foreach(['cert','photo','slip'] as $f)if($a[$f])ctype_digit((string)$a[$f])&&q('DELETE FROM files WHERE id=?',[(int)$a[$f]]);
 q('DELETE FROM applications WHERE username=?',[$x['username']]);}
 q('DELETE FROM users WHERE id=?',[$i]);}
 $nav=['pending'=>'Pending Applications','students'=>'Students','lecturers'=>'Lecturers','accounting'=>'Accounting &amp; Hall Tickets','courses'=>'Courses','enroll'=>'Enrollment','attendance'=>'Attendance','news'=>'Announcements','backup'=>'Backup &amp; Restore','security'=>'Security','logs'=>'View Logs'];$p=$_GET['p']??'pending';
@@ -14,7 +14,7 @@ q('INSERT INTO enrollments VALUES(?,?)',[db()->lastInsertId(),$a['course_id']]);
 flash('Approved. Username <b>'.e($us).'</b>, password <b>'.e($pw).'</b>. The applicant can also collect these on the status page.');}}
 if($d=='reject')q('UPDATE applications SET status="rejected" WHERE id=?',[$id]);
 if($d=='deluser'){$x=q('SELECT * FROM users WHERE id=? AND role<>"admin"',[$id])->fetch();if($x){wipe($x);flash('Account and all related data deleted.');}}
-if($d=='delapp'){$a=q('SELECT * FROM applications WHERE id=?',[$id])->fetch();if($a){$x=q('SELECT * FROM users WHERE username=? AND role="student"',[$a['username']??''])->fetch();if($x)wipe($x);foreach(['cert','photo','slip'] as $f)if($a[$f])@unlink(__DIR__.'/uploads/'.$a[$f]);q('DELETE FROM applications WHERE id=?',[$id]);flash('Application and all related data deleted.');}}
+if($d=='delapp'){$a=q('SELECT * FROM applications WHERE id=?',[$id])->fetch();if($a){$x=q('SELECT * FROM users WHERE username=? AND role="student"',[$a['username']??''])->fetch();if($x)wipe($x);foreach(['cert','photo','slip'] as $f)if($a[$f])ctype_digit((string)$a[$f])&&q('DELETE FROM files WHERE id=?',[(int)$a[$f]]);q('DELETE FROM applications WHERE id=?',[$id]);flash('Application and all related data deleted.');}}
 if($d=='toggle'&&in_array($_POST['f'],['paid','hall_ok']))q('UPDATE users SET '.$_POST['f'].'=1-'.$_POST['f'].' WHERE id=?',[$id]);
 if($d=='addlec'){try{q('INSERT INTO users(username,password,role,name,email) VALUES(?,?,?,?,?)',[trim($_POST['username']),password_hash($_POST['password'],PASSWORD_DEFAULT),'lecturer',$_POST['name'],$_POST['email']]);flash('Lecturer added.');}catch(Exception $x){flash('That username already exists.');}}
 if($d=='addcourse')q('INSERT INTO courses(code,name,lecturer_id) VALUES(?,?,?)',[$_POST['code'],$_POST['name'],$_POST['lid']?:null]);
@@ -33,7 +33,7 @@ elseif($np!==''&&(strlen($np)<8||$np!==$_POST['confirm']))flash('New password mu
 else{q('UPDATE users SET username=? WHERE id=?',[$nu,$me['id']]);if($np!=='')q('UPDATE users SET password=? WHERE id=?',[password_hash($np,PASSWORD_DEFAULT),$me['id']]);$_SESSION['u']['username']=$nu;flash('Admin account updated. Use the new details next time you log in.');}}
 go('?p='.$p);}
 head(strip_tags(html_entity_decode($nav[$p]??'Admin')),$nav);
-if($p=='pending'){$r=[];$f=fn($x)=>$x?'<a href="/uploads/'.e($x).'" target=_blank>View</a>':'-';
+if($p=='pending'){$r=[];$f=fn($x)=>$x?'<a href="/file.php?id='.e($x).'" target=_blank>View</a>':'-';
 foreach(q('SELECT a.*,c.code FROM applications a LEFT JOIN courses c ON c.id=a.course_id ORDER BY a.status="pending" DESC,a.id DESC')->fetchAll() as $a)$r[]=['#'.$a['id'],e($a['full_name']).'<br><small class=muted>'.e($a['email']).' / '.e($a['phone']).'</small>',e($a['code']),e($a['dob']).' / '.e($a['gender']),$f($a['cert']).' | '.$f($a['photo']).' | '.$f($a['slip']),'<span class="tag '.$a['status'].'">'.$a['status'].'</span>',($a['status']=='pending'?pf('approve',$a['id'],'Approve','ok').pf('reject',$a['id'],'Reject','no'):'').pf('delapp',$a['id'],'Delete','no')];
 tbl(['Ref','Applicant','Course','DOB / Gender','Documents','Status','Action'],$r);}
 elseif($p=='students'){$r=[];foreach(q('SELECT u.*,c.name cn FROM users u LEFT JOIN courses c ON c.id=u.course_id WHERE role="student"')->fetchAll() as $s)$r[]=[e($s['reg_no']),e($s['name']),e($s['cn']),e($s['username']),pf('deluser',$s['id'],'Delete','no')];tbl(['Reg No','Name','Course','Username',''],$r);}
