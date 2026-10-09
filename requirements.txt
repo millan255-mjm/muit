@@ -1,0 +1,7 @@
+# Runtime requirements (PHP project - installed on Railway through composer.json)
+PHP >= 8.1
+ext-pdo
+ext-pdo_mysql
+ext-mbstring
+MySQL 8 (Railway MySQL plugin)
+# Front-end (loaded from CDN): qrcodejs 1.0.0 (hall ticket QR codes)

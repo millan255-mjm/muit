@@ -1,0 +1,1 @@
+{"name":"muit/student-portal","description":"Millan University of Information Technology portal","type":"project","require":{"php":">=8.1","ext-pdo":"*","ext-pdo_mysql":"*","ext-mbstring":"*"}}
